@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小朋友下樓梯 - 極速挑戰</title>
+    <title>小朋友下樓梯 - 極速挑戰 (WASD版)</title>
     <style>
         body {
             margin: 0;
@@ -85,7 +85,6 @@
         
         .hidden { display: none !important; }
 
-        /* 簡單的頂部尖刺裝飾 */
         .spikes {
             width: 100%;
             height: 15px;
@@ -117,10 +116,10 @@
 
         <div id="start-screen">
             <h1>小朋友下樓梯</h1>
-            <p>使用 <b>← 左</b> 和 <b>右 →</b> 鍵移動</p>
+            <p>移動方式：</p>
+            <p><b>← / A</b> (左) ｜ <b>→ / D</b> (右)</p>
             <p>不要碰到頂部尖刺</p>
             <p>不要掉到底部深淵</p>
-            <p>速度會越來越快！</p>
             <button onclick="startGame()">開始遊戲</button>
         </div>
 
@@ -149,12 +148,12 @@
         let isGameOver = false;
         let score = 0;
         let frames = 0;
-        let gameSpeed = 2; // 初始速度
+        let gameSpeed = 2;
         
         // 按鍵狀態
         const keys = {
-            ArrowLeft: false,
-            ArrowRight: false
+            left: false,
+            right: false
         };
 
         // 角色設定
@@ -166,24 +165,37 @@
             vx: 0,
             vy: 0,
             speed: 5,
-            jumpForce: -8, // 碰到彈力平台的彈跳力
+            jumpForce: -8,
             gravity: 0.4,
             color: '#3498db',
             onGround: false
         };
 
-        // 平台陣列
         let platforms = [];
 
-        // 監聽鍵盤
+        // --- 鍵盤控制邏輯更新 (支援 WASD 的 A和D) ---
         window.addEventListener('keydown', (e) => {
-            if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
-        });
-        window.addEventListener('keyup', (e) => {
-            if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+            const key = e.key.toLowerCase(); // 轉小寫方便判斷
+            
+            if (key === 'arrowleft' || key === 'a') {
+                keys.left = true;
+            }
+            if (key === 'arrowright' || key === 'd') {
+                keys.right = true;
+            }
         });
 
-        // 初始化遊戲
+        window.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            
+            if (key === 'arrowleft' || key === 'a') {
+                keys.left = false;
+            }
+            if (key === 'arrowright' || key === 'd') {
+                keys.right = false;
+            }
+        });
+
         function init() {
             player.x = canvas.width / 2 - player.width / 2;
             player.y = 100;
@@ -191,18 +203,18 @@
             player.vy = 0;
             score = 0;
             frames = 0;
-            gameSpeed = 2; // 重置速度
+            gameSpeed = 2;
             isGameOver = false;
             platforms = [];
 
-            // 初始生成一些平台
+            // 初始生成平台
             for (let i = 0; i < 6; i++) {
                 platforms.push({
                     x: Math.random() * (canvas.width - 70),
                     y: 100 + i * 100,
                     width: 70,
                     height: 15,
-                    type: 'normal', // normal, bounce, fragile
+                    type: 'normal',
                     active: true
                 });
             }
@@ -225,26 +237,22 @@
             gameOverScreen.classList.remove('hidden');
         }
 
-        // 繪製角色（小朋友風格）
         function drawPlayer() {
-            // 身體
             ctx.fillStyle = player.color;
             ctx.fillRect(player.x, player.y, player.width, player.height);
             
-            // 頭部 (肉色)
             ctx.fillStyle = '#ffccaa';
             ctx.fillRect(player.x + 2, player.y - 10, player.width - 4, 12);
             
-            // 帽子 (紅色)
             ctx.fillStyle = '#e74c3c';
-            ctx.fillRect(player.x, player.y - 14, player.width, 6); // 帽簷
-            ctx.fillRect(player.x + 4, player.y - 18, player.width - 8, 4); // 帽頂
+            ctx.fillRect(player.x, player.y - 14, player.width, 6);
+            ctx.fillRect(player.x + 4, player.y - 18, player.width - 8, 4);
 
-            // 眼睛
             ctx.fillStyle = 'black';
-            if (keys.ArrowLeft) {
+            // 根據左右移動改變眼睛方向
+            if (keys.left) {
                 ctx.fillRect(player.x + 4, player.y - 6, 2, 2);
-            } else if (keys.ArrowRight) {
+            } else if (keys.right) {
                 ctx.fillRect(player.x + 14, player.y - 6, 2, 2);
             } else {
                 ctx.fillRect(player.x + 5, player.y - 6, 2, 2);
@@ -256,18 +264,14 @@
             platforms.forEach(p => {
                 if (!p.active) return;
 
-                if (p.type === 'normal') ctx.fillStyle = '#2ecc71'; // 綠色
-                else if (p.type === 'bounce') ctx.fillStyle = '#f1c40f'; // 黃色
-                else if (p.type === 'fragile') ctx.fillStyle = '#e74c3c'; // 紅色
+                if (p.type === 'normal') ctx.fillStyle = '#2ecc71';
+                else if (p.type === 'bounce') ctx.fillStyle = '#f1c40f';
+                else if (p.type === 'fragile') ctx.fillStyle = '#e74c3c';
 
-                // 平台本體
                 ctx.fillRect(p.x, p.y, p.width, p.height);
-
-                // 平台裝飾 (立體感)
                 ctx.fillStyle = 'rgba(0,0,0,0.2)';
                 ctx.fillRect(p.x, p.y + p.height - 4, p.width, 4);
                 
-                // 特殊平台標示
                 if (p.type === 'bounce') {
                     ctx.fillStyle = '#fff';
                     ctx.fillRect(p.x + 10, p.y + 2, p.width - 20, 4);
@@ -281,11 +285,9 @@
         }
 
         function drawTopSpikes() {
-            // 繪製頂部的危險區域指示
             ctx.fillStyle = 'rgba(231, 76, 60, 0.3)';
             ctx.fillRect(0, 0, canvas.width, 20);
             
-            // 繪製尖刺形狀
             ctx.beginPath();
             ctx.fillStyle = '#7f8c8d';
             for(let i=0; i<canvas.width; i+=20) {
@@ -301,23 +303,20 @@
 
             frames++;
             
-            // --- 難度與分數控制 ---
-            // 每 300 幀 (約5秒) 增加一次速度
             if (frames % 300 === 0) {
                 gameSpeed += 0.2;
                 speedDisplay.innerText = (gameSpeed / 2).toFixed(1);
             }
             
-            // 分數隨時間增加
             if (frames % 60 === 0) {
                 score++;
                 scoreEl.innerText = score;
             }
 
-            // --- 玩家移動邏輯 ---
-            if (keys.ArrowLeft) {
+            // --- 移動邏輯更新 (使用 keys.left / keys.right) ---
+            if (keys.left) {
                 player.vx = -player.speed;
-            } else if (keys.ArrowRight) {
+            } else if (keys.right) {
                 player.vx = player.speed;
             } else {
                 player.vx = 0;
@@ -325,39 +324,26 @@
 
             player.x += player.vx;
             player.y += player.vy;
-            player.vy += player.gravity; // 重力
+            player.vy += player.gravity;
 
-            // 邊界檢查 (左右穿越)
             if (player.x + player.width < 0) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.width;
 
-            // 死亡檢查
-            // 1. 掉到底部
-            if (player.y > canvas.height) {
-                endGame();
-            }
-            // 2. 碰到頂部尖刺 (y < 20)
-            if (player.y < 15) {
-                // 增加一點受傷特效或直接死亡
-                endGame();
-            }
+            if (player.y > canvas.height) endGame();
+            if (player.y < 15) endGame();
 
-            // --- 平台邏輯 ---
             player.onGround = false;
             
-            // 移除超出頂部的平台
             if (platforms.length > 0 && platforms[0].y + platforms[0].height < 0) {
                 platforms.shift();
             }
 
-            // 生成新平台 (當最後一個平台上升到一定高度時)
             let lastPlatform = platforms[platforms.length - 1];
-            if (lastPlatform.y < canvas.height - 100) { // 間距
+            if (lastPlatform.y < canvas.height - 100) {
                 let pWidth = 70 + Math.random() * 30;
                 let pX = Math.random() * (canvas.width - pWidth);
                 let pY = canvas.height;
                 
-                // 隨機決定類型
                 let rand = Math.random();
                 let type = 'normal';
                 if (rand > 0.8) type = 'bounce';
@@ -373,52 +359,35 @@
                 });
             }
 
-            // 更新平台位置與碰撞檢測
             platforms.forEach(p => {
                 if (!p.active) return;
 
-                // 平台向上移動
                 p.y -= gameSpeed;
 
-                // 碰撞檢測 (AABB - 只有當玩家「向下落」且位於平台上方時才觸發)
-                if (player.vy > 0 && // 正在下落
-                    player.x + player.width > p.x + 5 && // 寬度判定(稍微縮減判定範圍以防邊緣bug)
+                if (player.vy > 0 &&
+                    player.x + player.width > p.x + 5 &&
                     player.x < p.x + p.width - 5 &&
                     player.y + player.height > p.y &&
-                    player.y + player.height < p.y + p.height + player.vy // 確保沒有穿過
+                    player.y + player.height < p.y + p.height + player.vy
                    ) {
                     
-                    // 觸發碰撞
                     if (p.type === 'bounce') {
-                        player.vy = player.jumpForce; // 彈起來
+                        player.vy = player.jumpForce;
                     } else if (p.type === 'fragile') {
-                         // 踩到易碎平台：重設 Y 位置並讓平台失效
                         player.y = p.y - player.height;
-                        player.vy = -gameSpeed; // 讓玩家跟隨平台速度
-                        p.active = false; // 平台消失
-                        // 短暫停留在空中
+                        player.vy = -gameSpeed;
+                        p.active = false;
                         player.vy = -2; 
                     } else {
-                        // 普通平台：黏在平台上
                         player.y = p.y - player.height;
-                        player.vy = 0; // 消除垂直速度
+                        player.vy = 0;
                         player.onGround = true;
                     }
                 }
-                
-                // 如果玩家在普通平台上，強制給予向上的速度以模擬跟隨平台移動
-                // 注意：這裡簡化處理，直接在物理運算時若 onGround 且未按跳躍(本遊戲無主動跳躍)，則跟隨
             });
-            
-            // 修正：如果玩家站在平台上，其實玩家的Y座標應該要減去 gameSpeed
-            // 但因為我們在碰撞檢測時直接設定 player.y = p.y - height，所以下一幀重力會把玩家拉下來，
-            // 然後再次觸發碰撞修正位置。
-            // 為了讓視覺更平滑，如果檢測到站在平台上，我們可以稍微抵銷重力或直接讓玩家跟著平台動。
-            // 在這個簡單版本中，上面的碰撞邏輯 (player.y = p.y...) 配合高速刷新已經足夠。
         }
 
         function draw() {
-            // 清空畫布
             ctx.fillStyle = '#2c3e50';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -433,9 +402,7 @@
             gameLoopId = requestAnimationFrame(loop);
         }
 
-        // 首次繪製背景
         draw();
-
     </script>
 </body>
 </html>
