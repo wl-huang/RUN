@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小朋友下樓梯 - 穩定速度版</title>
+    <title>小朋友下樓梯 - 手感優化+穩定鎖幀版</title>
     <style>
         body {
             margin: 0;
@@ -167,7 +167,7 @@
 
         <div id="start-screen">
             <h1>小朋友下樓梯</h1>
-            <p><b>穩定版：</b>修復不同螢幕速度不一問題</p>
+            <p><b>完美版：</b>優化手感 + 強制 60FPS</p>
             <p>按鈕 / 鍵盤左右移動</p>
             <button onclick="startGame()">開始遊戲</button>
         </div>
@@ -195,16 +195,17 @@
         let score = 0;
         let frames = 0;
         
-        // --- FPS 控制變數 ---
-        let lastTime = 0;
-        const FPS = 60; // 強制每秒跑 60 次
-        const interval = 1000 / FPS;
-        
-        // 物理參數 (維持優化後的手感)
-        let gameSpeed = 1.5;
+        // --- FPS 與物理參數 ---
+        // 使用您指定的優化參數
+        let gameSpeed = 1.5; 
         const GRAVITY = 0.25; 
         const MOVE_SPEED = 4; 
         const JUMP_FORCE = -6.5; 
+
+        // --- 時間累加器變數 (最穩定的 FPS 鎖定法) ---
+        let lastTime = 0;
+        let accumulator = 0;
+        const TIME_STEP = 1000 / 60; // 強制物理每 16.66ms 跑一次
         
         const keys = { left: false, right: false };
 
@@ -304,9 +305,13 @@
             player.vy = 0;
             score = 0;
             frames = 0;
-            gameSpeed = 1.5;
+            gameSpeed = 1.5; // 保持優化版的初始速度
             isGameOver = false;
             platforms = [];
+            
+            // 重置時間累加器
+            lastTime = performance.now();
+            accumulator = 0;
 
             for (let i = 0; i < 6; i++) {
                 platforms.push({
@@ -320,8 +325,6 @@
             }
             scoreEl.innerText = score;
             speedDisplay.innerText = "1.0";
-            
-            lastTime = performance.now();
         }
 
         function startGame() {
@@ -410,14 +413,14 @@
                 scoreEl.innerText = score;
             }
 
-            // 移動
+            // 移動 (使用優化後的 MOVE_SPEED)
             if (keys.left) player.vx = -MOVE_SPEED;
             else if (keys.right) player.vx = MOVE_SPEED;
             else player.vx = 0;
 
             player.x += player.vx;
             player.y += player.vy;
-            player.vy += GRAVITY;
+            player.vy += GRAVITY; // 使用優化後的 GRAVITY
 
             if (player.x + player.width < 0) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.width;
@@ -482,21 +485,27 @@
             drawTopSpikes();
         }
 
-        // --- 核心修改：加入時間控制的迴圈 ---
-        function loop(timestamp) {
+        // --- 改良後的遊戲迴圈 (Accumulator Pattern) ---
+        // 確保在所有設備上，邏輯每秒只執行 60 次
+        function loop(currentTime) {
             gameLoopId = requestAnimationFrame(loop);
-            
-            // 計算距離上次執行過了多久
-            const deltaTime = timestamp - lastTime;
-            
-            // 只有當時間超過間隔 (約 16.6ms) 才執行更新
-            if (deltaTime >= interval) {
-                // 校正時間，減去多餘的誤差
-                lastTime = timestamp - (deltaTime % interval);
-                
+
+            // 計算距離上次呼叫經過的時間
+            let deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            // 防止過度卡頓時累積太多
+            if (deltaTime > 100) deltaTime = 100;
+
+            accumulator += deltaTime;
+
+            // 只要累積的時間超過 16.66ms，就執行一次 update
+            while (accumulator >= TIME_STEP) {
                 update();
-                draw();
+                accumulator -= TIME_STEP;
             }
+            
+            draw();
         }
 
         canvas.width = canvas.clientWidth;
