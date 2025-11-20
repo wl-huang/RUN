@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小朋友下樓梯 - 手機音效版</title>
+    <title>小朋友下樓梯 - 手感優化版</title>
     <style>
         body {
             margin: 0;
@@ -17,13 +17,13 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: white;
             overflow: hidden;
-            touch-action: none; /* 禁止手機瀏覽器預設的縮放與捲動 */
+            touch-action: none;
         }
 
         #game-container {
             position: relative;
             width: 100%;
-            max-width: 400px; /* 手機上滿版，電腦上限制寬度 */
+            max-width: 400px;
             height: 100%;
             max-height: 600px;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
@@ -39,7 +39,6 @@
             height: 100%;
         }
 
-        /* UI 層 */
         #ui-layer {
             position: absolute;
             top: 0;
@@ -61,7 +60,6 @@
             text-shadow: 1px 1px 2px black;
         }
 
-        /* 開始與結束畫面 */
         #start-screen, #game-over-screen {
             position: absolute;
             top: 0;
@@ -98,7 +96,6 @@
         
         .hidden { display: none !important; }
 
-        /* 虛擬按鍵 (手機用) */
         #touch-controls {
             position: absolute;
             bottom: 20px;
@@ -109,7 +106,7 @@
             justify-content: space-between;
             padding: 0 20px;
             box-sizing: border-box;
-            pointer-events: none; /* 容器不擋點擊，只有按鈕擋 */
+            pointer-events: none;
             z-index: 15;
         }
 
@@ -125,7 +122,7 @@
             justify-content: center;
             font-size: 30px;
             user-select: none;
-            -webkit-user-select: none; /* Safari */
+            -webkit-user-select: none;
             touch-action: manipulation;
         }
 
@@ -134,7 +131,6 @@
             transform: scale(0.95);
         }
 
-        /* 頂部尖刺 */
         .spikes {
             width: 100%;
             height: 15px;
@@ -171,9 +167,8 @@
 
         <div id="start-screen">
             <h1>小朋友下樓梯</h1>
-            <p><b>電腦：</b>方向鍵 或 WASD</p>
-            <p><b>手機：</b>點擊下方左右按鈕</p>
-            <p>不要碰頂部尖刺，不要掉落深淵</p>
+            <p><b>優化版：</b>重力減輕、操控更穩</p>
+            <p>按鈕 / 鍵盤左右移動</p>
             <button onclick="startGame()">開始遊戲</button>
         </div>
 
@@ -192,32 +187,31 @@
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
         const speedDisplay = document.getElementById('speed-display');
-        
-        // 觸控按鈕
         const btnLeft = document.getElementById('btn-left');
         const btnRight = document.getElementById('btn-right');
 
-        // 遊戲變數
         let gameLoopId;
         let isGameOver = false;
         let score = 0;
         let frames = 0;
-        let gameSpeed = 2;
         
-        const keys = {
-            left: false,
-            right: false
-        };
+        // --- 物理參數調整區 ---
+        let gameSpeed = 1.5; // 初始平台速度稍微減慢，配合低重力
+        const GRAVITY = 0.25; // 原本0.4 -> 0.25 (更輕盈)
+        const MOVE_SPEED = 4; // 原本5 -> 4 (更精準，不滑)
+        const JUMP_FORCE = -6.5; // 配合低重力調整彈跳力
+        
+        const keys = { left: false, right: false };
 
         const player = {
             x: 200, y: 100, width: 20, height: 30,
-            vx: 0, vy: 0, speed: 5, jumpForce: -8,
-            gravity: 0.4, color: '#3498db', onGround: false
+            vx: 0, vy: 0, 
+            color: '#3498db', onGround: false
         };
 
         let platforms = [];
 
-        // --- 音效系統 (Web Audio API) ---
+        // --- 音效系統 ---
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
 
@@ -232,49 +226,40 @@
 
         function playSound(type) {
             if (!audioCtx) return;
-            
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-            
             osc.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-
             const now = audioCtx.currentTime;
 
             if (type === 'jump') {
-                // 跳躍聲：頻率快速上升
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(300, now);
-                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
-                gainNode.gain.setValueAtTime(0.3, now);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            } 
-            else if (type === 'break') {
-                // 碎裂聲：低頻方波
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(100, now);
-                osc.frequency.linearRampToValueAtTime(50, now + 0.1);
-                gainNode.gain.setValueAtTime(0.3, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.15); // 稍微拉長聲音
+                gainNode.gain.setValueAtTime(0.2, now);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
                 osc.start(now);
                 osc.stop(now + 0.15);
-            }
-            else if (type === 'gameover') {
-                // 失敗聲：長鋸齒波下降
+            } else if (type === 'break') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+                gainNode.gain.setValueAtTime(0.2, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            } else if (type === 'gameover') {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(400, now);
                 osc.frequency.exponentialRampToValueAtTime(50, now + 0.8);
-                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.setValueAtTime(0.3, now);
                 gainNode.gain.linearRampToValueAtTime(0, now + 0.8);
                 osc.start(now);
                 osc.stop(now + 0.8);
             }
         }
 
-        // --- 控制輸入 ---
-        // 鍵盤
+        // --- 輸入控制 ---
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
             if (k === 'arrowleft' || k === 'a') keys.left = true;
@@ -286,33 +271,26 @@
             if (k === 'arrowright' || k === 'd') keys.right = false;
         });
 
-        // 觸控 (支援多點觸控)
         const handleTouch = (btn, isPressed, keyName) => {
-            // 視覺回饋
             if(isPressed) btn.classList.add('active');
             else btn.classList.remove('active');
-            // 邏輯設定
             keys[keyName] = isPressed;
         };
 
-        // 綁定觸控事件 (使用 touchstart/end 以獲得最佳反應速度)
         btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(btnLeft, true, 'left'); }, {passive: false});
         btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(btnLeft, false, 'left'); });
-        
         btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(btnRight, true, 'right'); }, {passive: false});
         btnRight.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(btnRight, false, 'right'); });
-
-        // 滑鼠點擊 (作為觸控的備用)
+        
+        // 滑鼠備用
         btnLeft.addEventListener('mousedown', () => handleTouch(btnLeft, true, 'left'));
         btnLeft.addEventListener('mouseup', () => handleTouch(btnLeft, false, 'left'));
         btnLeft.addEventListener('mouseleave', () => handleTouch(btnLeft, false, 'left'));
-        
         btnRight.addEventListener('mousedown', () => handleTouch(btnRight, true, 'right'));
         btnRight.addEventListener('mouseup', () => handleTouch(btnRight, false, 'right'));
         btnRight.addEventListener('mouseleave', () => handleTouch(btnRight, false, 'right'));
 
         function init() {
-            // 根據螢幕調整 Canvas 內部解析度 (防止模糊)
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
 
@@ -322,7 +300,7 @@
             player.vy = 0;
             score = 0;
             frames = 0;
-            gameSpeed = 2;
+            gameSpeed = 1.5; // 重置速度
             isGameOver = false;
             platforms = [];
 
@@ -341,7 +319,7 @@
         }
 
         function startGame() {
-            initAudio(); // 初始化音效引擎
+            initAudio();
             startScreen.classList.add('hidden');
             gameOverScreen.classList.add('hidden');
             init();
@@ -360,20 +338,16 @@
         function drawPlayer() {
             ctx.fillStyle = player.color;
             ctx.fillRect(player.x, player.y, player.width, player.height);
-            
             ctx.fillStyle = '#ffccaa';
             ctx.fillRect(player.x + 2, player.y - 10, player.width - 4, 12);
-            
             ctx.fillStyle = '#e74c3c';
             ctx.fillRect(player.x, player.y - 14, player.width, 6);
             ctx.fillRect(player.x + 4, player.y - 18, player.width - 8, 4);
 
             ctx.fillStyle = 'black';
-            if (keys.left) {
-                ctx.fillRect(player.x + 4, player.y - 6, 2, 2);
-            } else if (keys.right) {
-                ctx.fillRect(player.x + 14, player.y - 6, 2, 2);
-            } else {
+            if (keys.left) ctx.fillRect(player.x + 4, player.y - 6, 2, 2);
+            else if (keys.right) ctx.fillRect(player.x + 14, player.y - 6, 2, 2);
+            else {
                 ctx.fillRect(player.x + 5, player.y - 6, 2, 2);
                 ctx.fillRect(player.x + 13, player.y - 6, 2, 2);
             }
@@ -382,7 +356,6 @@
         function drawPlatforms() {
             platforms.forEach(p => {
                 if (!p.active) return;
-
                 if (p.type === 'normal') ctx.fillStyle = '#2ecc71';
                 else if (p.type === 'bounce') ctx.fillStyle = '#f1c40f';
                 else if (p.type === 'fragile') ctx.fillStyle = '#e74c3c';
@@ -408,7 +381,6 @@
             ctx.fillRect(0, 0, canvas.width, 20);
             ctx.beginPath();
             ctx.fillStyle = '#7f8c8d';
-            // 根據寬度動態調整尖刺數量
             let spikeWidth = 20;
             for(let i=0; i<canvas.width; i+=spikeWidth) {
                 ctx.lineTo(i, 0);
@@ -420,38 +392,40 @@
 
         function update() {
             if (isGameOver) return;
-
             frames++;
             
+            // 難度曲線：每5秒增加一點點速度
             if (frames % 300 === 0) {
-                gameSpeed += 0.2;
-                speedDisplay.innerText = (gameSpeed / 2).toFixed(1);
+                gameSpeed += 0.15; // 加速也變平緩一點
+                speedDisplay.innerText = (gameSpeed / 1.5).toFixed(1);
             }
             if (frames % 60 === 0) {
                 score++;
                 scoreEl.innerText = score;
             }
 
-            if (keys.left) player.vx = -player.speed;
-            else if (keys.right) player.vx = player.speed;
+            // 左右移動
+            if (keys.left) player.vx = -MOVE_SPEED;
+            else if (keys.right) player.vx = MOVE_SPEED;
             else player.vx = 0;
 
             player.x += player.vx;
             player.y += player.vy;
-            player.vy += player.gravity;
+            player.vy += GRAVITY; // 應用重力
 
+            // 邊界穿越
             if (player.x + player.width < 0) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.width;
 
             if (player.y > canvas.height) endGame();
             if (player.y < 15) endGame();
 
-            player.onGround = false;
-            
+            // 移除舊平台
             if (platforms.length > 0 && platforms[0].y + platforms[0].height < 0) {
                 platforms.shift();
             }
 
+            // 生成新平台
             let lastPlatform = platforms[platforms.length - 1];
             if (lastPlatform.y < canvas.height - 100) {
                 let pWidth = 70 + Math.random() * 30;
@@ -464,40 +438,35 @@
                 else if (rand > 0.7) type = 'fragile';
 
                 platforms.push({
-                    x: pX,
-                    y: pY,
-                    width: pWidth,
-                    height: 15,
-                    type: type,
-                    active: true
+                    x: pX, y: pY, width: pWidth, height: 15, type: type, active: true
                 });
             }
 
+            // 平台碰撞邏輯
             platforms.forEach(p => {
                 if (!p.active) return;
-
                 p.y -= gameSpeed;
 
+                // 碰撞檢測優化 (稍微放寬一點判定範圍，減少邊緣滑落感)
                 if (player.vy > 0 &&
-                    player.x + player.width > p.x + 5 &&
-                    player.x < p.x + p.width - 5 &&
+                    player.x + player.width > p.x + 2 && // 5 -> 2 (更寬容)
+                    player.x < p.x + p.width - 2 &&
                     player.y + player.height > p.y &&
-                    player.y + player.height < p.y + p.height + player.vy
+                    player.y + player.height < p.y + p.height + player.vy + 2 // +2 增加判定厚度
                    ) {
                     
                     if (p.type === 'bounce') {
-                        playSound('jump'); // 播放跳躍音效
-                        player.vy = player.jumpForce;
+                        playSound('jump');
+                        player.vy = JUMP_FORCE;
                     } else if (p.type === 'fragile') {
-                        playSound('break'); // 播放碎裂音效
+                        playSound('break');
                         player.y = p.y - player.height;
                         player.vy = -gameSpeed;
                         p.active = false;
-                        player.vy = -2; 
+                        player.vy = -1; // 碎裂後輕微彈起
                     } else {
                         player.y = p.y - player.height;
                         player.vy = 0;
-                        player.onGround = true;
                     }
                 }
             });
@@ -517,7 +486,6 @@
             gameLoopId = requestAnimationFrame(loop);
         }
 
-        // 初始調整大小
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
         draw();
