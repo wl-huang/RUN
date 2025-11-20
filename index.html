@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小朋友下樓梯 - 手感優化版</title>
+    <title>小朋友下樓梯 - 穩定速度版</title>
     <style>
         body {
             margin: 0;
@@ -167,7 +167,7 @@
 
         <div id="start-screen">
             <h1>小朋友下樓梯</h1>
-            <p><b>優化版：</b>重力減輕、操控更穩</p>
+            <p><b>穩定版：</b>修復不同螢幕速度不一問題</p>
             <p>按鈕 / 鍵盤左右移動</p>
             <button onclick="startGame()">開始遊戲</button>
         </div>
@@ -195,11 +195,16 @@
         let score = 0;
         let frames = 0;
         
-        // --- 物理參數調整區 ---
-        let gameSpeed = 1.5; // 初始平台速度稍微減慢，配合低重力
-        const GRAVITY = 0.25; // 原本0.4 -> 0.25 (更輕盈)
-        const MOVE_SPEED = 4; // 原本5 -> 4 (更精準，不滑)
-        const JUMP_FORCE = -6.5; // 配合低重力調整彈跳力
+        // --- FPS 控制變數 ---
+        let lastTime = 0;
+        const FPS = 60; // 強制每秒跑 60 次
+        const interval = 1000 / FPS;
+        
+        // 物理參數 (維持優化後的手感)
+        let gameSpeed = 1.5;
+        const GRAVITY = 0.25; 
+        const MOVE_SPEED = 4; 
+        const JUMP_FORCE = -6.5; 
         
         const keys = { left: false, right: false };
 
@@ -235,7 +240,7 @@
             if (type === 'jump') {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(300, now);
-                osc.frequency.linearRampToValueAtTime(600, now + 0.15); // 稍微拉長聲音
+                osc.frequency.linearRampToValueAtTime(600, now + 0.15);
                 gainNode.gain.setValueAtTime(0.2, now);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
                 osc.start(now);
@@ -282,7 +287,6 @@
         btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(btnRight, true, 'right'); }, {passive: false});
         btnRight.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(btnRight, false, 'right'); });
         
-        // 滑鼠備用
         btnLeft.addEventListener('mousedown', () => handleTouch(btnLeft, true, 'left'));
         btnLeft.addEventListener('mouseup', () => handleTouch(btnLeft, false, 'left'));
         btnLeft.addEventListener('mouseleave', () => handleTouch(btnLeft, false, 'left'));
@@ -300,7 +304,7 @@
             player.vy = 0;
             score = 0;
             frames = 0;
-            gameSpeed = 1.5; // 重置速度
+            gameSpeed = 1.5;
             isGameOver = false;
             platforms = [];
 
@@ -316,6 +320,8 @@
             }
             scoreEl.innerText = score;
             speedDisplay.innerText = "1.0";
+            
+            lastTime = performance.now();
         }
 
         function startGame() {
@@ -324,7 +330,7 @@
             gameOverScreen.classList.add('hidden');
             init();
             cancelAnimationFrame(gameLoopId);
-            loop();
+            gameLoopId = requestAnimationFrame(loop);
         }
 
         function endGame() {
@@ -394,9 +400,9 @@
             if (isGameOver) return;
             frames++;
             
-            // 難度曲線：每5秒增加一點點速度
+            // 每 5 秒 (300幀) 增加一次速度
             if (frames % 300 === 0) {
-                gameSpeed += 0.15; // 加速也變平緩一點
+                gameSpeed += 0.15; 
                 speedDisplay.innerText = (gameSpeed / 1.5).toFixed(1);
             }
             if (frames % 60 === 0) {
@@ -404,28 +410,26 @@
                 scoreEl.innerText = score;
             }
 
-            // 左右移動
+            // 移動
             if (keys.left) player.vx = -MOVE_SPEED;
             else if (keys.right) player.vx = MOVE_SPEED;
             else player.vx = 0;
 
             player.x += player.vx;
             player.y += player.vy;
-            player.vy += GRAVITY; // 應用重力
+            player.vy += GRAVITY;
 
-            // 邊界穿越
             if (player.x + player.width < 0) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.width;
 
             if (player.y > canvas.height) endGame();
             if (player.y < 15) endGame();
 
-            // 移除舊平台
+            // 平台管理
             if (platforms.length > 0 && platforms[0].y + platforms[0].height < 0) {
                 platforms.shift();
             }
 
-            // 生成新平台
             let lastPlatform = platforms[platforms.length - 1];
             if (lastPlatform.y < canvas.height - 100) {
                 let pWidth = 70 + Math.random() * 30;
@@ -442,17 +446,15 @@
                 });
             }
 
-            // 平台碰撞邏輯
             platforms.forEach(p => {
                 if (!p.active) return;
                 p.y -= gameSpeed;
 
-                // 碰撞檢測優化 (稍微放寬一點判定範圍，減少邊緣滑落感)
                 if (player.vy > 0 &&
-                    player.x + player.width > p.x + 2 && // 5 -> 2 (更寬容)
+                    player.x + player.width > p.x + 2 &&
                     player.x < p.x + p.width - 2 &&
                     player.y + player.height > p.y &&
-                    player.y + player.height < p.y + p.height + player.vy + 2 // +2 增加判定厚度
+                    player.y + player.height < p.y + p.height + player.vy + 2
                    ) {
                     
                     if (p.type === 'bounce') {
@@ -463,7 +465,7 @@
                         player.y = p.y - player.height;
                         player.vy = -gameSpeed;
                         p.active = false;
-                        player.vy = -1; // 碎裂後輕微彈起
+                        player.vy = -1;
                     } else {
                         player.y = p.y - player.height;
                         player.vy = 0;
@@ -480,10 +482,21 @@
             drawTopSpikes();
         }
 
-        function loop() {
-            update();
-            draw();
+        // --- 核心修改：加入時間控制的迴圈 ---
+        function loop(timestamp) {
             gameLoopId = requestAnimationFrame(loop);
+            
+            // 計算距離上次執行過了多久
+            const deltaTime = timestamp - lastTime;
+            
+            // 只有當時間超過間隔 (約 16.6ms) 才執行更新
+            if (deltaTime >= interval) {
+                // 校正時間，減去多餘的誤差
+                lastTime = timestamp - (deltaTime % interval);
+                
+                update();
+                draw();
+            }
         }
 
         canvas.width = canvas.clientWidth;
