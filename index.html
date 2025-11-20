@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小朋友下樓梯 - 手感優化+穩定鎖幀版</title>
+    <title>小朋友下樓梯 - setInterval 版</title>
     <style>
         body {
             margin: 0;
@@ -167,7 +167,7 @@
 
         <div id="start-screen">
             <h1>小朋友下樓梯</h1>
-            <p><b>完美版：</b>優化手感 + 強制 60FPS</p>
+            <p><b>setInterval 版</b></p>
             <p>按鈕 / 鍵盤左右移動</p>
             <button onclick="startGame()">開始遊戲</button>
         </div>
@@ -190,22 +190,18 @@
         const btnLeft = document.getElementById('btn-left');
         const btnRight = document.getElementById('btn-right');
 
-        let gameLoopId;
+        // 這裡會存放 setInterval 的 ID，用來停止遊戲
+        let gameIntervalId;
+        
         let isGameOver = false;
         let score = 0;
         let frames = 0;
         
-        // --- FPS 與物理參數 ---
-        // 使用您指定的優化參數
+        // --- 物理參數 ---
         let gameSpeed = 1.5; 
         const GRAVITY = 0.25; 
         const MOVE_SPEED = 4; 
         const JUMP_FORCE = -6.5; 
-
-        // --- 時間累加器變數 (最穩定的 FPS 鎖定法) ---
-        let lastTime = 0;
-        let accumulator = 0;
-        const TIME_STEP = 1000 / 60; // 強制物理每 16.66ms 跑一次
         
         const keys = { left: false, right: false };
 
@@ -305,13 +301,9 @@
             player.vy = 0;
             score = 0;
             frames = 0;
-            gameSpeed = 1.5; // 保持優化版的初始速度
+            gameSpeed = 1.5; 
             isGameOver = false;
             platforms = [];
-            
-            // 重置時間累加器
-            lastTime = performance.now();
-            accumulator = 0;
 
             for (let i = 0; i < 6; i++) {
                 platforms.push({
@@ -331,14 +323,24 @@
             initAudio();
             startScreen.classList.add('hidden');
             gameOverScreen.classList.add('hidden');
+            
+            // 確保之前的 Interval 被清除
+            if (gameIntervalId) clearInterval(gameIntervalId);
+            
             init();
-            cancelAnimationFrame(gameLoopId);
-            gameLoopId = requestAnimationFrame(loop);
+            
+            // --- 這裡改用 setInterval ---
+            // 1000 / 60 約等於 16.666 毫秒，目標是每秒跑 60 次
+            gameIntervalId = setInterval(loop, 1000 / 60);
         }
 
         function endGame() {
             if (isGameOver) return;
             isGameOver = true;
+            
+            // 遊戲結束時，清除 Interval 停止循環
+            clearInterval(gameIntervalId);
+            
             playSound('gameover');
             finalScoreEl.innerText = Math.floor(score);
             gameOverScreen.classList.remove('hidden');
@@ -403,7 +405,7 @@
             if (isGameOver) return;
             frames++;
             
-            // 每 5 秒 (300幀) 增加一次速度
+            // 難度控制
             if (frames % 300 === 0) {
                 gameSpeed += 0.15; 
                 speedDisplay.innerText = (gameSpeed / 1.5).toFixed(1);
@@ -413,14 +415,14 @@
                 scoreEl.innerText = score;
             }
 
-            // 移動 (使用優化後的 MOVE_SPEED)
+            // 移動
             if (keys.left) player.vx = -MOVE_SPEED;
             else if (keys.right) player.vx = MOVE_SPEED;
             else player.vx = 0;
 
             player.x += player.vx;
             player.y += player.vy;
-            player.vy += GRAVITY; // 使用優化後的 GRAVITY
+            player.vy += GRAVITY; 
 
             if (player.x + player.width < 0) player.x = canvas.width;
             if (player.x > canvas.width) player.x = -player.width;
@@ -485,29 +487,13 @@
             drawTopSpikes();
         }
 
-        // --- 改良後的遊戲迴圈 (Accumulator Pattern) ---
-        // 確保在所有設備上，邏輯每秒只執行 60 次
-        function loop(currentTime) {
-            gameLoopId = requestAnimationFrame(loop);
-
-            // 計算距離上次呼叫經過的時間
-            let deltaTime = currentTime - lastTime;
-            lastTime = currentTime;
-
-            // 防止過度卡頓時累積太多
-            if (deltaTime > 100) deltaTime = 100;
-
-            accumulator += deltaTime;
-
-            // 只要累積的時間超過 16.66ms，就執行一次 update
-            while (accumulator >= TIME_STEP) {
-                update();
-                accumulator -= TIME_STEP;
-            }
-            
+        // --- 單純的 Loop 函數，不需要 requestAnimationFrame ---
+        function loop() {
+            update();
             draw();
         }
 
+        // 初始畫面繪製一次
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
         draw();
