@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小朋友下樓梯 - 極速挑戰 (WASD版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小朋友下樓梯 - 手機音效版</title>
     <style>
         body {
             margin: 0;
@@ -17,20 +17,29 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             color: white;
             overflow: hidden;
+            touch-action: none; /* 禁止手機瀏覽器預設的縮放與捲動 */
         }
 
         #game-container {
             position: relative;
+            width: 100%;
+            max-width: 400px; /* 手機上滿版，電腦上限制寬度 */
+            height: 100%;
+            max-height: 600px;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
             border: 4px solid #34495e;
             border-radius: 8px;
+            background-color: #000;
+            overflow: hidden;
         }
 
         canvas {
-            background-color: #000;
             display: block;
+            width: 100%;
+            height: 100%;
         }
 
+        /* UI 層 */
         #ui-layer {
             position: absolute;
             top: 0;
@@ -43,6 +52,7 @@
             justify-content: space-between;
             padding: 10px;
             box-sizing: border-box;
+            z-index: 10;
         }
 
         .score-board {
@@ -51,19 +61,21 @@
             text-shadow: 1px 1px 2px black;
         }
 
+        /* 開始與結束畫面 */
         #start-screen, #game-over-screen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            background: rgba(0, 0, 0, 0.85);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
             pointer-events: auto; 
+            z-index: 20;
         }
 
         h1 { margin: 0 0 20px 0; color: #f1c40f; font-size: 32px; }
@@ -73,18 +85,56 @@
             background-color: #e74c3c;
             color: white;
             border: none;
-            padding: 12px 24px;
-            font-size: 18px;
-            border-radius: 5px;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 50px;
             cursor: pointer;
             transition: transform 0.1s;
             margin-top: 20px;
+            box-shadow: 0 4px 0 #c0392b;
         }
 
-        button:hover { transform: scale(1.05); background-color: #c0392b; }
+        button:active { transform: translateY(4px); box-shadow: none; }
         
         .hidden { display: none !important; }
 
+        /* 虛擬按鍵 (手機用) */
+        #touch-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            height: 100px;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            box-sizing: border-box;
+            pointer-events: none; /* 容器不擋點擊，只有按鈕擋 */
+            z-index: 15;
+        }
+
+        .control-btn {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            user-select: none;
+            -webkit-user-select: none; /* Safari */
+            touch-action: manipulation;
+        }
+
+        .control-btn:active, .control-btn.active {
+            background: rgba(255, 255, 255, 0.5);
+            transform: scale(0.95);
+        }
+
+        /* 頂部尖刺 */
         .spikes {
             width: 100%;
             height: 15px;
@@ -109,6 +159,11 @@
         <canvas id="gameCanvas" width="400" height="600"></canvas>
         <div class="spikes"></div>
         
+        <div id="touch-controls">
+            <div class="control-btn" id="btn-left">◀</div>
+            <div class="control-btn" id="btn-right">▶</div>
+        </div>
+
         <div id="ui-layer">
             <div class="score-board">地下 <span id="score">0</span> 層</div>
             <div style="text-align: right; font-size: 14px; color: #ccc;">速度: <span id="speed-display">1.0</span>x</div>
@@ -116,10 +171,9 @@
 
         <div id="start-screen">
             <h1>小朋友下樓梯</h1>
-            <p>移動方式：</p>
-            <p><b>← / A</b> (左) ｜ <b>→ / D</b> (右)</p>
-            <p>不要碰到頂部尖刺</p>
-            <p>不要掉到底部深淵</p>
+            <p><b>電腦：</b>方向鍵 或 WASD</p>
+            <p><b>手機：</b>點擊下方左右按鈕</p>
+            <p>不要碰頂部尖刺，不要掉落深淵</p>
             <button onclick="startGame()">開始遊戲</button>
         </div>
 
@@ -130,10 +184,6 @@
         </div>
     </div>
 
-    <div style="margin-top: 10px; color: #bdc3c7; font-size: 14px;">
-        提示：黃色平台有彈性，紅色平台踩一次就會碎裂。
-    </div>
-
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -142,6 +192,10 @@
         const startScreen = document.getElementById('start-screen');
         const gameOverScreen = document.getElementById('game-over-screen');
         const speedDisplay = document.getElementById('speed-display');
+        
+        // 觸控按鈕
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
 
         // 遊戲變數
         let gameLoopId;
@@ -150,53 +204,118 @@
         let frames = 0;
         let gameSpeed = 2;
         
-        // 按鍵狀態
         const keys = {
             left: false,
             right: false
         };
 
-        // 角色設定
         const player = {
-            x: 200,
-            y: 100,
-            width: 20,
-            height: 30,
-            vx: 0,
-            vy: 0,
-            speed: 5,
-            jumpForce: -8,
-            gravity: 0.4,
-            color: '#3498db',
-            onGround: false
+            x: 200, y: 100, width: 20, height: 30,
+            vx: 0, vy: 0, speed: 5, jumpForce: -8,
+            gravity: 0.4, color: '#3498db', onGround: false
         };
 
         let platforms = [];
 
-        // --- 鍵盤控制邏輯更新 (支援 WASD 的 A和D) ---
-        window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase(); // 轉小寫方便判斷
+        // --- 音效系統 (Web Audio API) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (!audioCtx) return;
             
-            if (key === 'arrowleft' || key === 'a') {
-                keys.left = true;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'jump') {
+                // 跳躍聲：頻率快速上升
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.linearRampToValueAtTime(600, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } 
+            else if (type === 'break') {
+                // 碎裂聲：低頻方波
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+                gainNode.gain.setValueAtTime(0.3, now);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
             }
-            if (key === 'arrowright' || key === 'd') {
-                keys.right = true;
+            else if (type === 'gameover') {
+                // 失敗聲：長鋸齒波下降
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.8);
+                gainNode.gain.setValueAtTime(0.5, now);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.8);
+                osc.start(now);
+                osc.stop(now + 0.8);
             }
+        }
+
+        // --- 控制輸入 ---
+        // 鍵盤
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'arrowleft' || k === 'a') keys.left = true;
+            if (k === 'arrowright' || k === 'd') keys.right = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            if (k === 'arrowleft' || k === 'a') keys.left = false;
+            if (k === 'arrowright' || k === 'd') keys.right = false;
         });
 
-        window.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            
-            if (key === 'arrowleft' || key === 'a') {
-                keys.left = false;
-            }
-            if (key === 'arrowright' || key === 'd') {
-                keys.right = false;
-            }
-        });
+        // 觸控 (支援多點觸控)
+        const handleTouch = (btn, isPressed, keyName) => {
+            // 視覺回饋
+            if(isPressed) btn.classList.add('active');
+            else btn.classList.remove('active');
+            // 邏輯設定
+            keys[keyName] = isPressed;
+        };
+
+        // 綁定觸控事件 (使用 touchstart/end 以獲得最佳反應速度)
+        btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(btnLeft, true, 'left'); }, {passive: false});
+        btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(btnLeft, false, 'left'); });
+        
+        btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); handleTouch(btnRight, true, 'right'); }, {passive: false});
+        btnRight.addEventListener('touchend', (e) => { e.preventDefault(); handleTouch(btnRight, false, 'right'); });
+
+        // 滑鼠點擊 (作為觸控的備用)
+        btnLeft.addEventListener('mousedown', () => handleTouch(btnLeft, true, 'left'));
+        btnLeft.addEventListener('mouseup', () => handleTouch(btnLeft, false, 'left'));
+        btnLeft.addEventListener('mouseleave', () => handleTouch(btnLeft, false, 'left'));
+        
+        btnRight.addEventListener('mousedown', () => handleTouch(btnRight, true, 'right'));
+        btnRight.addEventListener('mouseup', () => handleTouch(btnRight, false, 'right'));
+        btnRight.addEventListener('mouseleave', () => handleTouch(btnRight, false, 'right'));
 
         function init() {
+            // 根據螢幕調整 Canvas 內部解析度 (防止模糊)
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+
             player.x = canvas.width / 2 - player.width / 2;
             player.y = 100;
             player.vx = 0;
@@ -207,7 +326,6 @@
             isGameOver = false;
             platforms = [];
 
-            // 初始生成平台
             for (let i = 0; i < 6; i++) {
                 platforms.push({
                     x: Math.random() * (canvas.width - 70),
@@ -218,12 +336,12 @@
                     active: true
                 });
             }
-            
             scoreEl.innerText = score;
             speedDisplay.innerText = "1.0";
         }
 
         function startGame() {
+            initAudio(); // 初始化音效引擎
             startScreen.classList.add('hidden');
             gameOverScreen.classList.add('hidden');
             init();
@@ -232,7 +350,9 @@
         }
 
         function endGame() {
+            if (isGameOver) return;
             isGameOver = true;
+            playSound('gameover');
             finalScoreEl.innerText = Math.floor(score);
             gameOverScreen.classList.remove('hidden');
         }
@@ -249,7 +369,6 @@
             ctx.fillRect(player.x + 4, player.y - 18, player.width - 8, 4);
 
             ctx.fillStyle = 'black';
-            // 根據左右移動改變眼睛方向
             if (keys.left) {
                 ctx.fillRect(player.x + 4, player.y - 6, 2, 2);
             } else if (keys.right) {
@@ -287,13 +406,14 @@
         function drawTopSpikes() {
             ctx.fillStyle = 'rgba(231, 76, 60, 0.3)';
             ctx.fillRect(0, 0, canvas.width, 20);
-            
             ctx.beginPath();
             ctx.fillStyle = '#7f8c8d';
-            for(let i=0; i<canvas.width; i+=20) {
+            // 根據寬度動態調整尖刺數量
+            let spikeWidth = 20;
+            for(let i=0; i<canvas.width; i+=spikeWidth) {
                 ctx.lineTo(i, 0);
-                ctx.lineTo(i+10, 15);
-                ctx.lineTo(i+20, 0);
+                ctx.lineTo(i + spikeWidth/2, 15);
+                ctx.lineTo(i + spikeWidth, 0);
             }
             ctx.fill();
         }
@@ -307,20 +427,14 @@
                 gameSpeed += 0.2;
                 speedDisplay.innerText = (gameSpeed / 2).toFixed(1);
             }
-            
             if (frames % 60 === 0) {
                 score++;
                 scoreEl.innerText = score;
             }
 
-            // --- 移動邏輯更新 (使用 keys.left / keys.right) ---
-            if (keys.left) {
-                player.vx = -player.speed;
-            } else if (keys.right) {
-                player.vx = player.speed;
-            } else {
-                player.vx = 0;
-            }
+            if (keys.left) player.vx = -player.speed;
+            else if (keys.right) player.vx = player.speed;
+            else player.vx = 0;
 
             player.x += player.vx;
             player.y += player.vy;
@@ -372,8 +486,10 @@
                    ) {
                     
                     if (p.type === 'bounce') {
+                        playSound('jump'); // 播放跳躍音效
                         player.vy = player.jumpForce;
                     } else if (p.type === 'fragile') {
+                        playSound('break'); // 播放碎裂音效
                         player.y = p.y - player.height;
                         player.vy = -gameSpeed;
                         p.active = false;
@@ -390,7 +506,6 @@
         function draw() {
             ctx.fillStyle = '#2c3e50';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
             drawPlatforms();
             drawPlayer();
             drawTopSpikes();
@@ -402,6 +517,9 @@
             gameLoopId = requestAnimationFrame(loop);
         }
 
+        // 初始調整大小
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
         draw();
     </script>
 </body>
